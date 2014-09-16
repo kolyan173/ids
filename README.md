@@ -30,4 +30,4 @@
 ##Workflow details:
 - fork this repo and work in your own
 - during your work please do not forget to do commit for each logical change/improvement
-- when you finish do the pool request
+- when you finish do the pull request

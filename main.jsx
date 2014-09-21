@@ -16,77 +16,81 @@
  * - save indesign object model (document) as INDD file
  * - from INDD file create PDF file
  */
-
-var datafile = File.openDialog("Select a .json file");
-var pathData = datafile.absoluteURI;
-var inputData = $.evalFile(pathData); //  read the input data (.json) 
-var FramesPositionTop = 0;
-var myDocument =app.documents.add();
-myDocument.viewPreferences.horizontalMeasurementUnits = MeasurementUnits.points;
-myDocument.viewPreferences.verticalMeasurementUnits = MeasurementUnits.points; 
-for(var i=0; i < inputData.length; i++) {
-    var contentResult = [];
-    var newFrame = 1;
-    var contentArr = inputData[i].content;
-    var currentPage;
-    if(contentArr.length > 0) { 
-        for(var k = 0; k < contentArr.length; k++) {
-            var contentObj = contentArr[k];
-            for(var a in contentObj) {
-                if(a === "content") {
-                    var myText = contentObj[a]; 
-                    if(newFrame) {
-                        newFrame = 0;
-                        var countPage = myDocument.pages.length - 1;
-                        myDocument.pages.add();
-                        currentPage = myDocument.pages.item(countPage);
-                        contentResult.push(myText);
-                    } else {
-                            contentResult.push(myText);
-                        }                                                          
-                } else if(a === "styles") {
-                    switch(contentObj[a]) {
-                        case "paragraph": 
+main ();
+function main() {
+    var datafile = File.openDialog("Select a .json file"),
+        pathData = datafile.absoluteURI,
+        inputData = $.evalFile(pathData), //  read the input data (.json) 
+        myDocument = app.documents.add();
+        
+    myDocument.documentPreferences.facingPages = false;
+    
+    for(var i=0; i < inputData.length; i++) {
+        var contentResult = [],
+            newFrame = true,
+            contentArr = inputData[i].content,
+            currentPage;
+        
+        if(contentArr.length > 0) { 
+            for(var k = 0; k < contentArr.length; k++) {
+                var contentObj = contentArr[k];
+                for(var key in contentObj) {
+                    var contentText = contentObj[key]; 
+                    if(key === "content") {
+                        contentResult.push(contentText);
+                    } else if(key === "styles") {
+                        switch(contentText) {
+                            case "paragraph": 
                                 var last = contentResult.pop();
                                 contentResult.push('\n');
                                 contentResult.push(last);
-                            break;
-                        case "italic":
-                           // myTextFrame.texts.item(0).parentStory.appliedFont = app.fonts.item("Myriad Pro");
+                                break;
+                        }
                     }
                 }
             }
         }
-    }
-    if(contentResult.length > 0) {
-        var frameText = "";
-        for(var m = 0; m < contentResult.length; m++) {
+        if(contentResult.length > 0) {
+            var frameText = "",
+                pageNumber,
+                frameBounds;
+            for(var index = 0; index < contentResult.length; index++) {
               //each item in frames[n] should be inserted as indesign element (for example paragraph)      
-              frameText+= contentResult[m];        
-           }
-        //each item in frames array should be inserted as indesign text frame
-        TextFrameMaker(currentPage, GetBounds(myDocument, currentPage), frameText, true);        
+              frameText+= contentResult[index];        
+            }
+            currentPage = pageMaker (myDocument, i);
+            frameBounds = getBounds(myDocument, currentPage);
+            //each item in frames array should be inserted as indesign text frame
+            textFrameMaker(currentPage, frameBounds, frameText, true);  
+        }
     }
-}
-myDocument.pages[myDocument.pages.length - 1].remove();
+    
+    myDocument.pages[myDocument.pages.length - 1].remove();
+    
+    if(app.activeDocument.saved == false) {
+        // save indesign object model (document) as INDD file
+        app.activeDocument.save(File.saveDialog("Enter .indd file name")); 
+    }
+    //from INDD file create PDF file
+    app.activeDocument.exportFile(ExportFormat.pdfType, File.openDialog("Enter .pdf file name"), false);
+};
 
-function TextFrameMaker(myPage, myBounds, myString, myFitToContent, myFontName,){
+function textFrameMaker(myPage, myBounds, myString, myFitToContent, myFontName){
     var currentTextFrame = myPage.textFrames.add();
-    currentTextFrame.texts.item(0).insertionPoints.item(0).contents = myString
+    currentTextFrame.texts.item(0).insertionPoints.item(0).contents = myString;
     if(myFontName) {
         currentTextFrame.texts.item(0).parentStory.appliedFont = app.fonts.item(myFontName);
     }
     currentTextFrame.geometricBounds = myBounds;
-    if(myFitToContent == true){
-        currentTextFrame.fit(FitOptions.frameToContent);
+   if(myFitToContent == true){
+       //currentTextFrame.fit(FitOptions.frameToContent);
     }
     return currentTextFrame;
 };
 
-
-function GetBounds(myDocument, myPage){
+function getBounds(myDocument, myPage) {
     var myPageWidth = myDocument.documentPreferences.pageWidth;
-    var myPageHeight = myDocument.documentPreferences.pageHeight
+    var myPageHeight = myDocument.documentPreferences.pageHeight;
     if(myPage.side == PageSideOptions.leftHand){
         var myX2 = myPage.marginPreferences.left;
         var myX1 = myPage.marginPreferences.right;
@@ -95,16 +99,18 @@ function GetBounds(myDocument, myPage){
         var myX1 = myPage.marginPreferences.left;
         var myX2 = myPage.marginPreferences.right;
     }
-    var myY1 = myPage.marginPreferences.top + FramesPositionTop;
-    var myX2 = myPageWidth - myX2;
-    var myY2 = myPageHeight - myPage.marginPreferences.bottom; 
-    FramesPositionTop = myY1;
+    var myY1 = myPage.marginPreferences.top,
+        myX2 = myPageWidth - myX2,
+        myY2 = myPageHeight - myPage.marginPreferences.bottom; 
+    
     return [myY1, myX1, myY2, myX2];
 };
 
-if(app.activeDocument.saved == false){
-// save indesign object model (document) as INDD file
-    app.activeDocument.save(File.saveDialog("Enter .indd file name")); 
-}
-//from INDD file create PDF file
-app.activeDocument.exportFile(ExportFormat.pdfType, File.openDialog("Enter .pdf file name"), false);
+function pageMaker(myDocument, pageNumber) {
+    if(pageNumber) {
+        myDocument.pages.add();  
+    }
+    currentPage = myDocument.pages.lastItem();
+    return currentPage;
+};
+

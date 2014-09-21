@@ -64,9 +64,6 @@ function main() {
             textFrameMaker(currentPage, frameBounds, frameText, true);  
         }
     }
-    
-    myDocument.pages[myDocument.pages.length - 1].remove();
-    
     if(app.activeDocument.saved == false) {
         // save indesign object model (document) as INDD file
         app.activeDocument.save(File.saveDialog("Enter .indd file name")); 
